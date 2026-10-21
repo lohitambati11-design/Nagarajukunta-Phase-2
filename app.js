@@ -801,67 +801,99 @@ document
 
 
 
+
 /* ==========================
-   SECURE ADMIN LOGIN
+   ADMIN LOGIN POPUP
 ========================== */
 
-document
-    .getElementById("adminBtn")
-    .addEventListener("click", async () => {
+const adminLoginPopup =
+    document.getElementById("adminLoginPopup");
+
+const adminLoginForm =
+    document.getElementById("adminLoginForm");
+
+const adminLoginMessage =
+    document.getElementById("adminLoginMessage");
+
+const adminLoginSubmit =
+    document.getElementById("adminLoginSubmit");
+
+document.getElementById("adminBtn").addEventListener("click", async () => {
+    if (isAdmin) {
         try {
-            if (isAdmin) {
-                await signOut(auth);
-                isAdmin = false;
-
-                document.getElementById("adminBtn").innerText =
-                    "Admin Login";
-
-                if (selectedPlot) {
-                    showPlotPopup(selectedPlot);
-                }
-
-                alert("Admin logged out");
-                return;
-            }
-
-            const email = prompt("Enter Admin Email");
-
-            if (!email) return;
-
-            const password = prompt("Enter Admin Password");
-
-            if (!password) return;
-
-            const result = await signInWithEmailAndPassword(
-                auth,
-                email.trim(),
-                password
-            );
-
-            if (result.user.uid !== ADMIN_UID) {
-                await signOut(auth);
-                alert("This account is not authorized as an admin.");
-                return;
-            }
-
-            isAdmin = true;
-
-            document.getElementById("adminBtn").innerText =
-                "Admin Logout";
-
-            if (selectedPlot) {
-                showPlotPopup(selectedPlot);
-            }
-
-            alert("Admin login successful");
-
+            await signOut(auth);
         } catch (error) {
-            console.error("Admin login error:", error);
-            alert("Login failed. Check your email and password.");
+            console.error("Logout failed:", error);
+            alert("Logout failed. Please try again.");
         }
-    });
+        return;
+    }
 
-/* Restore admin state when the page reloads */
+    adminLoginMessage.textContent = "";
+    adminLoginForm.reset();
+    adminLoginPopup.style.display = "flex";
+    document.getElementById("adminEmail").focus();
+});
+
+document.getElementById("closeAdminLogin").addEventListener("click", () => {
+    adminLoginPopup.style.display = "none";
+    adminLoginMessage.textContent = "";
+});
+
+adminLoginPopup.addEventListener("click", (event) => {
+    if (event.target === adminLoginPopup) {
+        adminLoginPopup.style.display = "none";
+    }
+});
+
+adminLoginForm.addEventListener("submit", async (event) => {
+    event.preventDefault();
+
+    const email =
+        document.getElementById("adminEmail").value.trim();
+
+    const password =
+        document.getElementById("adminPassword").value;
+
+    adminLoginSubmit.disabled = true;
+    adminLoginSubmit.textContent = "Signing in...";
+    adminLoginMessage.textContent = "";
+
+    try {
+        const result = await signInWithEmailAndPassword(
+            auth,
+            email,
+            password
+        );
+
+        if (result.user.uid !== ADMIN_UID) {
+            await signOut(auth);
+            adminLoginMessage.textContent =
+                "This account is not authorized as an admin.";
+            return;
+        }
+
+        adminLoginPopup.style.display = "none";
+        adminLoginForm.reset();
+
+        if (selectedPlot) {
+            showPlotPopup(selectedPlot);
+        }
+
+        alert("Admin login successful");
+
+    } catch (error) {
+        console.error("Admin login failed:", error);
+
+        adminLoginMessage.textContent =
+            "Login failed. Check your email and password.";
+    } finally {
+        adminLoginSubmit.disabled = false;
+        adminLoginSubmit.textContent = "Login";
+    }
+});
+
+/* Restore admin state when authentication changes */
 onAuthStateChanged(auth, (user) => {
     isAdmin = !!user && user.uid === ADMIN_UID;
 
@@ -872,6 +904,7 @@ onAuthStateChanged(auth, (user) => {
         showPlotPopup(selectedPlot);
     }
 });
+
 
 
 
