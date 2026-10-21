@@ -1,16 +1,26 @@
+
 import {
     db,
+    auth,
     doc,
     setDoc,
     collection,
     getDocs,
-    onSnapshot
+    onSnapshot,
+    signInWithEmailAndPassword,
+    signOut,
+    onAuthStateChanged
 } from "./firebase.js";
+
+
+
+const ADMIN_UID = "YwilXZwZPSNE63WcwvkngzrXX8P2";
 
 const svg = document.getElementById("map");
 
 let isAdmin = false;
 let selectedPlot = null;
+
 
 
 /* ==========================
@@ -46,18 +56,24 @@ function updateCounts() {
    FIREBASE SAVE
 ========================== */
 
+
 async function savePlots() {
+    if (
+        !auth.currentUser ||
+        auth.currentUser.uid !== ADMIN_UID
+    ) {
+        alert("Only the authorized admin can change plot details.");
+        throw new Error("Unauthorized plot update");
+    }
 
     for (const plot of plots) {
-
         await setDoc(
             doc(db, "plots", String(plot.id)),
             plot
         );
-
     }
-
 }
+
 
 
 /* ==========================
@@ -784,43 +800,79 @@ document
     );
 
 
+
 /* ==========================
-   ADMIN LOGIN
+   SECURE ADMIN LOGIN
 ========================== */
 
 document
     .getElementById("adminBtn")
-    .addEventListener(
-        "click",
-        () => {
+    .addEventListener("click", async () => {
+        try {
+            if (isAdmin) {
+                await signOut(auth);
+                isAdmin = false;
 
-            const password =
-                prompt(
-                    "Enter Admin Password"
-                );
+                document.getElementById("adminBtn").innerText =
+                    "Admin Login";
 
+                if (selectedPlot) {
+                    showPlotPopup(selectedPlot);
+                }
 
-            if (password === "7702") {
-
-                isAdmin = true;
-
-
-                alert(
-                    "Admin Mode Enabled"
-                );
-
+                alert("Admin logged out");
+                return;
             }
 
-            else {
+            const email = prompt("Enter Admin Email");
 
-                alert(
-                    "Wrong Password"
-                );
+            if (!email) return;
 
+            const password = prompt("Enter Admin Password");
+
+            if (!password) return;
+
+            const result = await signInWithEmailAndPassword(
+                auth,
+                email.trim(),
+                password
+            );
+
+            if (result.user.uid !== ADMIN_UID) {
+                await signOut(auth);
+                alert("This account is not authorized as an admin.");
+                return;
             }
 
+            isAdmin = true;
+
+            document.getElementById("adminBtn").innerText =
+                "Admin Logout";
+
+            if (selectedPlot) {
+                showPlotPopup(selectedPlot);
+            }
+
+            alert("Admin login successful");
+
+        } catch (error) {
+            console.error("Admin login error:", error);
+            alert("Login failed. Check your email and password.");
         }
-    );
+    });
+
+/* Restore admin state when the page reloads */
+onAuthStateChanged(auth, (user) => {
+    isAdmin = !!user && user.uid === ADMIN_UID;
+
+    document.getElementById("adminBtn").innerText =
+        isAdmin ? "Admin Logout" : "Admin Login";
+
+    if (selectedPlot) {
+        showPlotPopup(selectedPlot);
+    }
+});
+
 
 
 /* ==========================
